@@ -31,6 +31,7 @@ const (
 const (
 	NormalQuery QueryType = "NORMAL"
 	JSONQuery   QueryType = "JSON"
+	PlanQuery   QueryType = "PLAN"
 )
 
 type TableRef struct {
@@ -49,6 +50,7 @@ type QueryResult struct {
 	ResultSet  [][]string
 	QueryType  QueryType
 	JSONData   []byte
+	PlanView   string
 	Headers    []string
 	Timestamp  time.Time
 	Duration   time.Duration
@@ -257,6 +259,17 @@ func (c *Client) AsyncQuery(ctx context.Context, queries []string, maxConcurrenc
 			}
 			// Ensure token is released when this query completes.
 			defer func() { <-semaphore }()
+
+			// A plan directive (| plan, | analyze, | baseline ...) wraps the
+			// statement into the dialect specific EXPLAIN, regardless of the
+			// inner statement type, so it is routed before the read/write split.
+			if inner, dir, ok := trimPlanDirective(query); ok {
+				start := time.Now()
+				c.runPlan(ctx, inner, dir, &result, args...)
+				result.Duration = time.Since(start)
+				resultChan <- result
+				return
+			}
 
 			// Execute the query using the passed context.
 			// If the user cancels or it times out, the driver halts execution.

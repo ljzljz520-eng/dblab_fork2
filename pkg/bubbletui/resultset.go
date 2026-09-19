@@ -299,6 +299,10 @@ func (r ResultSet) Update(msg tea.Msg) (ResultSet, tea.Cmd) {
 			}
 
 			switch qr.QueryType {
+			case client.PlanQuery:
+				planPanel := newTextPanel()
+				planPanel.SetContent(qr.PlanView)
+				r.tablesMetadata[i] = planPanel
 			case client.JSONQuery:
 				jsonPanel := newTextPanel()
 				var prettyJSON bytes.Buffer
